@@ -7,7 +7,10 @@ chmod +x /usr/local/bin/kubectl
 export KUBECONFIG=k3s.yaml
 export RUNNER_HOSTNAME=$(docker info --format '{{lower .Name}}')
 
-docker run -d --name=k3s --privileged --tmpfs /run --tmpfs /var/run -p 6443:6443 -p 80:80 $(if [ "$INPUT_CUSTOM_REGISTRY" = true ]; then echo --mount "type=bind,src=$RUNNER_WORKSPACE/$(echo $RUNNER_WORKSPACE | sed 's|.*/||')/$INPUT_REGISTRIES_YAML_PATH,dst=/etc/rancher/k3s/registries.yaml"; fi) rancher/k3s:$INPUT_K3S_TAG server "$INPUT_K3S_ARGUMENTS"
+docker run -d --name=k3s --privileged --tmpfs /run --tmpfs /var/run -p 6443:6443 -p 80:80 \
+	$(if [[ "$INPUT_REGISTRIES_YAML_PATH" != "" ]]; then echo --mount "type=bind,src=$RUNNER_WORKSPACE/$(echo $RUNNER_WORKSPACE | sed 's|.*/||')/$INPUT_REGISTRIES_YAML_PATH,dst=/etc/rancher/k3s/registries.yaml"; fi) \
+	$(if [[ "$INPUT_CONTAINERD_TOML_PATH" != "" ]]; then echo --mount "type=bind,src=$RUNNER_WORKSPACE/$(echo $RUNNER_WORKSPACE | sed 's|.*/||')/$INPUT_CONTAINERD_TOML_PATH,dst=/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl"; fi) \
+	rancher/k3s:$INPUT_K3S_TAG server "$INPUT_K3S_ARGUMENTS"
 
 sleep 15
 

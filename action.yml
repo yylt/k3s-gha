@@ -8,15 +8,23 @@ inputs:
   k3s_tag:
     description: "k3s tag to use"
     required: false
-    default: 'v1.21.1+k3s1'
+    default: 'v1.29.4+k3s1'
   k3s_arguments:
     description: "k3s arguments"
     required: false
-    default: "--no-deploy=traefik"
+    default: ""
   kubectl_version:
     description: "kubectl version to use"
     required: false
-    default: "v1.22.2"
+    default: "v1.29.4"
+  registries_yaml_path:
+    description: "where to look for registries.yaml, relative path"
+    required: false
+    default: ""
+  containerd_toml_path:
+    description: "where to look for containerd.toml, relative path"
+    required: false
+    default: ""
   install_kubectl:
     description: "whenever to copy kubectl to runner workspace"
     required: false
