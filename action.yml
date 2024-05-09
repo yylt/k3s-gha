@@ -8,19 +8,66 @@ inputs:
   k3s_tag:
     description: "k3s tag to use"
     required: false
-    default: 'v1.21.1+k3s1'
+    default: 'v1.29.4-k3s1'
   k3s_arguments:
     description: "k3s arguments"
     required: false
-    default: "--no-deploy=traefik"
-  kubectl_version:
-    description: "kubectl version to use"
+    default: "--disable=servicelb"
+  registries_yaml_path:
+    description: "where to look for registries.yaml, relative path"
     required: false
-    default: "v1.22.2"
-  install_kubectl:
-    description: "whenever to copy kubectl to runner workspace"
+    default: ""
+  containerd_toml_path:
+    description: "where to look for containerd.toml, relative path"
     required: false
-    default: "true"
+    default: ""
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
+  using: 'composite'
+  steps:
+    - name: Check Runner OS
+      if: ${{ runner.os != 'Linux' }}
+      shell: bash
+      run: |
+        echo "::error title=⛔ error hint::Support Linux Only"
+        exit 1
+
+    - name: Install 
+      shell: bash
+      run: |
+        set -ex
+        
+        docker run -d --name=k3s --privileged -p 6443:6443 \
+          --mount "type=bind,src=/var/run,dst=/var/run" \
+          $(if [[ "${{ inputs.registries_yaml_path }}" != "" ]]; then echo --mount "type=bind,src=$RUNNER_WORKSPACE/$(echo $RUNNER_WORKSPACE | sed 's|.*/||')/${{ inputs.registries_yaml_path }},dst=/etc/rancher/k3s/registries.yaml"; fi) \
+          $(if [[ "${{ inputs.containerd_toml_path }}" != "" ]]; then echo --mount "type=bind,src=$RUNNER_WORKSPACE/$(echo $RUNNER_WORKSPACE | sed 's|.*/||')/${{ inputs.containerd_toml_path }},dst=/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl"; fi) \
+          rancher/k3s:${{ inputs.k3s_tag }} server "${{ inputs.k3s_arguments }}"
+        
+        export KUBECONFIG=$(pwd)/k3s.yaml
+        export RUNNER_HOSTNAME=$(docker info --format '{{lower .Name}}')
+        
+        sleep 15
+
+        docker cp k3s:/etc/rancher/k3s/k3s.yaml .
+        docker cp k3s:/bin/k3s /usr/local/bin/k3s
+        alias kubectl="k3s kubectl"
+
+        echo 'wait for k3s ready'
+        for attempt in {1..60}; do
+          if kubectl version; then
+            break;
+          elif [ "$attempt" -eq 60 ]; then
+            echo "timeout reached"
+            exit 1
+          else
+            echo "k3s is not yet up"
+            sleep 3
+          fi
+        done
+
+
+
+
+
+
+
+
