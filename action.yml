@@ -64,10 +64,57 @@ runs:
           fi
         done
 
-
-
-
-
-
-
-
+        echo 'apply install cni'
+        kubectl apply -f - <<-'EOF'
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: install-cni
+          namespace: kube-system
+        spec:
+          selector:
+            matchLabels:
+              k8s-app: install-cni
+          template:
+            metadata:
+              labels:
+                k8s-app: install-cni
+            spec:
+              containers:
+              - command:
+                - /install.sh
+                image: ghcr.io/yylt/cni:202406030832
+                imagePullPolicy: IfNotPresent
+                name: install-cni
+                volumeMounts:
+                - mountPath: /host/opt/cni/bin/
+                  name: host-cni-bin
+                - mountPath: /host/etc/cni/net.d
+                  name: host-cni-etc
+                env:
+                - name: WHEREABOUTS_LOOP
+                  value: "false"
+                - name: INSTALL_CNI_CONFLIST
+                  value: "true"
+                - name: INSTALL_CONFIG
+                  value: "false"
+              hostNetwork: true
+              restartPolicy: Always
+              tolerations:
+              - operator: Exists
+              volumes:
+              - hostPath:
+                  path: /opt/cni/bin
+                  type: "DirectoryOrCreate"
+                name: host-cni-bin
+              - hostPath:
+                  path: /etc/cni/net.d
+                  type: "DirectoryOrCreate"
+                name: host-cni-etc
+        EOF
+        
+        echo 'wait coredns ready...'
+        kubectl -n kube-system rollout status deploy/coredns --timeout=120s
+        echo 'coredns is ready.'
+        kubectl get no 
+        kubectl get po -A
